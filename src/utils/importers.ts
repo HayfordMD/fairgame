@@ -12,6 +12,9 @@ import {
   WinCondition,
 } from '../types/game';
 
+/**
+ * Parses a CSV string into an array of key-value record objects.
+ */
 export function parseCSV(csvText: string): Record<string, string>[] {
   const lines = csvText
     .split(/\r?\n/)
@@ -52,6 +55,10 @@ function splitCSVLine(line: string): string[] {
   return res;
 }
 
+/**
+ * Converts CSV rows into CardDefinition objects.
+ * Supported columns: name, copies, cost_stat, cost_amount, target, effect_type, effect_stat, effect_value, formula, condition, description
+ */
 export function importCardsFromCSV(
   csvText: string,
   defaultDeckId: string
@@ -86,6 +93,10 @@ export function importCardsFromCSV(
   });
 }
 
+/**
+ * Converts CSV rows into PieceArchetype objects.
+ * Supported columns: name, symbol, count, hp, attack, defense, move_range, attack_range, ap_cost, movement_type, respawn_turns
+ */
 export function importPiecesFromCSV(csvText: string): PieceArchetype[] {
   const rows = parseCSV(csvText);
   return rows.map((r, idx) => ({
@@ -119,6 +130,10 @@ export function importPiecesFromCSV(csvText: string): PieceArchetype[] {
   }));
 }
 
+/**
+ * Converts CSV rows into StatDefinition objects.
+ * Supported columns: id, name, initial, min, max, regen, color, description
+ */
 export function importStatsFromCSV(csvText: string): StatDefinition[] {
   const rows = parseCSV(csvText);
   return rows.map((r, idx) => ({
@@ -134,6 +149,15 @@ export function importStatsFromCSV(csvText: string): StatDefinition[] {
   }));
 }
 
+/**
+ * Parses a structured or natural-language rule DSL script into RuleTriggers and WinConditions.
+ * Examples supported:
+ *   WHEN ON_LAND_TILE IF tile.type == "boost" THEN player.vp += 2
+ *   WHEN ON_TURN_START IF player.gold >= 10 THEN player.vp += 1
+ *   WHEN ON_COMBAT THEN player.gold += 2
+ *   WIN WHEN player.vp >= 15
+ *   LOSE WHEN player.hp <= 0
+ */
 export function parseRulesScript(scriptText: string): {
   rules: RuleTrigger[];
   winConditions: WinCondition[];
@@ -147,6 +171,7 @@ export function parseRulesScript(scriptText: string): {
   const winConditions: WinCondition[] = [];
 
   lines.forEach((line, idx) => {
+    // Check WIN / LOSE WHEN
     const winMatch = line.match(
       /^(WIN|LOSE)\s+WHEN\s+(?:player\.)?([a-zA-Z0-9_]+)\s*(>=|<=|==|>|<)\s*(-?\d+(?:\.\d+)?)/i
     );
@@ -169,6 +194,7 @@ export function parseRulesScript(scriptText: string): {
       return;
     }
 
+    // Check WHEN <EVENT> [IF <COND>] THEN <ACTION>
     const ruleMatch = line.match(
       /^WHEN\s+([A-Z_]+)(?:\s+IF\s+(.+?))?\s+THEN\s+(.+)$/i
     );
@@ -248,6 +274,9 @@ export function parseRulesScript(scriptText: string): {
   return { rules, winConditions };
 }
 
+/**
+ * Validates and normalizes an uploaded JSON GameConfig object.
+ */
 export function validateAndNormalizeGameJSON(
   raw: unknown,
   fallbackConfig: GameConfig
@@ -290,6 +319,10 @@ export function validateAndNormalizeGameJSON(
   };
 }
 
+/**
+ * Parses ASCII/CSV Grid Map into BoardTile[] for rapid board plan upload.
+ * Symbols: . = normal, S = spawn, G = goal, # = obstacle, X = hazard, + = boost, $ = shop
+ */
 export function parseBoardMatrixText(matrixText: string): BoardTile[] {
   const rows = matrixText
     .split(/\r?\n/)

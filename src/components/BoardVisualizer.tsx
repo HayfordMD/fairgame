@@ -76,12 +76,12 @@ export const TILE_TYPE_META: Record<
 };
 
 const PLAYER_COLORS = [
-  '#3b82f6',
-  '#f43f5e',
-  '#10b981',
-  '#f59e0b',
-  '#a855f7',
-  '#06b6d4',
+  '#3b82f6', // P1 Blue
+  '#f43f5e', // P2 Rose
+  '#10b981', // P3 Emerald
+  '#f59e0b', // P4 Amber
+  '#a855f7', // P5 Purple
+  '#06b6d4', // P6 Cyan
 ];
 
 interface BoardVisualizerProps {
@@ -114,6 +114,7 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
   const viewBoxWidth = 1000;
   const viewBoxHeight = 1000;
 
+  // Compute normalized 0..1000 center coordinates for every tile so edges, heatmaps, and pieces work uniformly across all 4 topologies
   const tileCenters = new Map<string, { cx: number; cy: number; radius: number }>();
 
   if (board.topology === 'square_grid') {
@@ -160,6 +161,7 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
       });
     }
   } else {
+    // 'track' or 'graph' use 0..1000 coordinates directly
     const nodeRadius = board.topology === 'track' ? 38 : 46;
     for (const t of board.tiles) {
       tileCenters.set(t.id, {
@@ -170,6 +172,7 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
     }
   }
 
+  // Max heatmap value for color scaling
   let maxHeat = 1;
   if (heatmapMode !== 'none' && heatmapValues) {
     for (const val of Object.values(heatmapValues)) {
@@ -183,11 +186,13 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
     if (val <= 0) return 'rgba(15, 23, 42, 0.72)';
     const ratio = Math.min(1, val / maxHeat);
     if (heatmapMode === 'deaths') {
+      // Dark amber to bright crimson
       const r = Math.round(140 + 115 * ratio);
       const g = Math.round(30 * (1 - ratio));
       const b = Math.round(40 * (1 - ratio));
       return `rgba(${r}, ${g}, ${b}, ${0.35 + ratio * 0.55})`;
     }
+    // Visits: cool indigo to glowing cyan/emerald
     const r = Math.round(30 + 20 * ratio);
     const g = Math.round(80 + 165 * ratio);
     const b = Math.round(160 + 85 * (1 - ratio * 0.3));
@@ -208,6 +213,7 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
     onMoveGraphNode(draggingNodeId, normX, normY);
   };
 
+  // Group alive pieces by tileId
   const piecesByTile = new Map<string, RuntimePieceState[]>();
   for (const p of pieces) {
     if (!p.alive) continue;
@@ -266,8 +272,10 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
           </marker>
         </defs>
 
+        {/* Subtle blueprint background grid */}
         <rect width={viewBoxWidth} height={viewBoxHeight} fill="url(#minorGrid)" />
 
+        {/* Optional Uploaded Board Plan Image Overlay */}
         {board.backgroundImageUrl && (
           <image
             href={board.backgroundImageUrl}
@@ -280,6 +288,7 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
           />
         )}
 
+        {/* Connections / Edges for Track, Graph, and Portals */}
         {(board.topology === 'track' || board.topology === 'graph') &&
           board.tiles.map((t) => {
             const from = tileCenters.get(t.id);
@@ -287,6 +296,7 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
             return t.connections.map((targetId) => {
               const to = tileCenters.get(targetId);
               if (!to) return null;
+              // Calculate shortened endpoint for track arrow
               const dx = to.cx - from.cx;
               const dy = to.cy - from.cy;
               const len = Math.hypot(dx, dy) || 1;
@@ -309,6 +319,7 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
             });
           })}
 
+        {/* Portal links on any topology */}
         {board.tiles.map((t) => {
           if (!t.portalTargetId) return null;
           const from = tileCenters.get(t.id);
@@ -327,6 +338,7 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
           );
         })}
 
+        {/* Render Tiles / Nodes */}
         {board.tiles.map((t) => {
           const center = tileCenters.get(t.id);
           if (!center) return null;
@@ -393,6 +405,7 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
                 />
               )}
 
+              {/* Tile Badge / Type Icon */}
               {t.type !== 'normal' && tilePieces.length === 0 && (
                 <text
                   x={cx}
@@ -405,6 +418,7 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
                 </text>
               )}
 
+              {/* Tile Label */}
               <text
                 x={cx}
                 y={cy + radius * 0.58}
@@ -416,6 +430,7 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
                 {t.label.length > 11 ? `${t.label.slice(0, 10)}…` : t.label}
               </text>
 
+              {/* Heatmap numeric overlay */}
               {heatmapMode !== 'none' && (
                 <text
                   x={cx}
@@ -429,6 +444,7 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
                 </text>
               )}
 
+              {/* Effect count indicator pill */}
               {(t.onEnterEffects.length > 0 || t.onTurnEndEffects.length > 0) &&
                 heatmapMode === 'none' && (
                   <circle
@@ -441,6 +457,7 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
                   />
                 )}
 
+              {/* Render Pieces on this tile */}
               {tilePieces.map((piece, idx) => {
                 const offsetAngle = (idx / Math.max(1, tilePieces.length)) * Math.PI * 2;
                 const spread = tilePieces.length > 1 ? radius * 0.35 : 0;
@@ -467,6 +484,7 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
                     >
                       {piece.symbol}
                     </text>
+                    {/* Tiny HP bar under unit */}
                     <rect
                       x={px - 14}
                       y={py + Math.max(12, radius * 0.38)}
@@ -491,6 +509,7 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
         })}
       </svg>
 
+      {/* Top-left topology badge */}
       <div className="absolute top-3 left-3 flex items-center gap-2 bg-slate-900/90 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-300 pointer-events-none">
         <span className="w-2 h-2 rounded-full bg-indigo-400" />
         <span className="font-medium uppercase tracking-wider">

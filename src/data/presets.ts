@@ -478,6 +478,7 @@ export function generateGraphBoard(): BoardConfig {
 }
 
 export const PRESET_GAMES: GameConfig[] = [
+  // 1. TACTICAL GRID GAME (Square/Hex)
   {
     id: 'preset_crown_citadel',
     name: 'Crown & Citadel (Tactical Grid)',
@@ -721,7 +722,7 @@ export const PRESET_GAMES: GameConfig[] = [
         name: 'Forbidden Apocalypse',
         copies: 3,
         costStatId: 'mana',
-        costAmount: 10,
+        costAmount: 10, // BUG: Max Mana is 8, so this card can NEVER be played!
         targetType: 'enemy_player',
         effects: [
           {
@@ -865,6 +866,8 @@ export const PRESET_GAMES: GameConfig[] = [
       },
     ],
   },
+
+  // 2. TRACK / PATH RACE GAME
   {
     id: 'preset_chrono_circuit',
     name: 'Chrono Circuit (Track Race & Loop)',
@@ -1128,7 +1131,7 @@ export const PRESET_GAMES: GameConfig[] = [
           {
             id: 'act_loop_move',
             type: 'move_forward',
-            value: 4,
+            value: 4, // Note: Boost tiles are spaced every 4 tiles (2, 6, 10, 14, 18), so moving +4 lands on another Boost tile infinitely!
           },
           {
             id: 'act_loop_vp',
@@ -1138,12 +1141,14 @@ export const PRESET_GAMES: GameConfig[] = [
             value: 1,
           },
         ],
-        maxTriggersPerTurn: 0,
+        maxTriggersPerTurn: 0, // 0 = Unlimited! Will cause an infinite loop whenever a player lands on Boost!
         description:
           'When landing on a Boost space, jump forward 4 spaces and gain +1 Trophy. (WARNING: Since Boost pads are 4 spaces apart and maxTriggersPerTurn is 0, this creates a game-breaking infinite loop!)',
       },
     ],
   },
+
+  // 3. NODE / GRAPH TERRITORY GAME
   {
     id: 'preset_shattered_realms',
     name: 'Shattered Realms (Node Territory Map)',

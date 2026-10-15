@@ -204,6 +204,7 @@ export const PiecesAndStatsTab: React.FC<PiecesAndStatsTabProps> = ({
         </div>
       )}
 
+      {/* SECTION 1: Player Stats & Resource Economy */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -342,6 +343,7 @@ export const PiecesAndStatsTab: React.FC<PiecesAndStatsTabProps> = ({
           ))}
         </div>
 
+        {/* Global Variables Row */}
         <div className="pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
@@ -413,7 +415,9 @@ export const PiecesAndStatsTab: React.FC<PiecesAndStatsTabProps> = ({
         </div>
       </div>
 
+      {/* SECTION 2: Piece / Unit Archetype Configurator */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Piece List */}
         <div className="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -494,6 +498,7 @@ export const PiecesAndStatsTab: React.FC<PiecesAndStatsTabProps> = ({
           </div>
         </div>
 
+        {/* Piece Detail Editor */}
         <div className="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-xl p-5">
           {selectedPiece ? (
             <div className="space-y-5">
@@ -519,6 +524,7 @@ export const PiecesAndStatsTab: React.FC<PiecesAndStatsTabProps> = ({
                   </div>
                 </div>
 
+                {/* Symbol Picker */}
                 <div className="flex flex-wrap gap-1">
                   {PIECE_SYMBOLS.map((sym) => (
                     <button
@@ -538,6 +544,7 @@ export const PiecesAndStatsTab: React.FC<PiecesAndStatsTabProps> = ({
                 </div>
               </div>
 
+              {/* Combat & Mobility Attributes */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
                 <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
                   <label className="flex items-center gap-1.5 text-slate-400 mb-1">
@@ -648,6 +655,7 @@ export const PiecesAndStatsTab: React.FC<PiecesAndStatsTabProps> = ({
                 </div>
               </div>
 
+              {/* Movement Type & Respawn Settings */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs pt-2 border-t border-slate-800">
                 <div>
                   <label className="block text-slate-400 mb-1">
@@ -706,6 +714,7 @@ export const PiecesAndStatsTab: React.FC<PiecesAndStatsTabProps> = ({
                 </div>
               </div>
 
+              {/* On-Kill Bounty Effects */}
               <div className="space-y-2 pt-3 border-t border-slate-800 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-slate-200">

@@ -220,6 +220,7 @@ export const BoardCreatorTab: React.FC<BoardCreatorTabProps> = ({
         };
       }
       if (board.topology === 'graph' && t.id === targetId) {
+        // Make bidirectional in graph mode
         const revExists = t.connections.includes(selectedTile.id);
         return {
           ...t,
@@ -271,9 +272,12 @@ export const BoardCreatorTab: React.FC<BoardCreatorTabProps> = ({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Left / Center Column: Board Controls + Interactive Canvas */}
       <div className="lg:col-span-8 space-y-4">
+        {/* Top Toolbar */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Topology Selector */}
             <div className="flex flex-wrap items-center gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800">
               {(
                 [
@@ -298,6 +302,7 @@ export const BoardCreatorTab: React.FC<BoardCreatorTabProps> = ({
               ))}
             </div>
 
+            {/* Upload Blueprint Image & Matrix Plan */}
             <div className="flex items-center gap-2">
               <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium cursor-pointer border border-slate-700 transition-colors">
                 <ImageIcon className="w-3.5 h-3.5 text-indigo-400" />
@@ -319,6 +324,7 @@ export const BoardCreatorTab: React.FC<BoardCreatorTabProps> = ({
             </div>
           </div>
 
+          {/* Second Row: Dimensions / Graph Actions + Mode Switcher */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
             {board.topology === 'square_grid' || board.topology === 'hex_grid' ? (
               <div className="flex items-center gap-2 text-xs">
@@ -390,6 +396,7 @@ export const BoardCreatorTab: React.FC<BoardCreatorTabProps> = ({
               </div>
             )}
 
+            {/* Interaction Mode Toggle */}
             <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800">
               <button
                 onClick={() => setEditorMode('select')}
@@ -414,6 +421,7 @@ export const BoardCreatorTab: React.FC<BoardCreatorTabProps> = ({
             </div>
           </div>
 
+          {/* Paint Palette Bar */}
           {editorMode === 'paint' && (
             <div className="pt-2 border-t border-slate-800/80">
               <div className="text-xs text-slate-400 mb-2">
@@ -442,6 +450,7 @@ export const BoardCreatorTab: React.FC<BoardCreatorTabProps> = ({
             </div>
           )}
 
+          {/* Optional Background Image Opacity Controls */}
           {board.backgroundImageUrl && (
             <div className="flex items-center justify-between gap-4 pt-2 border-t border-slate-800/80 text-xs">
               <div className="flex items-center gap-3">
@@ -473,6 +482,7 @@ export const BoardCreatorTab: React.FC<BoardCreatorTabProps> = ({
           )}
         </div>
 
+        {/* Text/CSV Matrix Uploader Modal Drawer */}
         {showMatrixModal && (
           <div className="bg-slate-900 border border-indigo-500/40 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -513,6 +523,7 @@ export const BoardCreatorTab: React.FC<BoardCreatorTabProps> = ({
           </div>
         )}
 
+        {/* Interactive SVG Board Canvas */}
         <BoardVisualizer
           board={board}
           selectedTileId={selectedTileId}
@@ -523,6 +534,7 @@ export const BoardCreatorTab: React.FC<BoardCreatorTabProps> = ({
         />
       </div>
 
+      {/* Right Column: Selected Space / Tile Inspector */}
       <div className="lg:col-span-4 space-y-4">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -607,6 +619,7 @@ export const BoardCreatorTab: React.FC<BoardCreatorTabProps> = ({
                 </div>
               )}
 
+              {/* Portal Target Selector */}
               {selectedTile.type === 'portal' && (
                 <div>
                   <label className="block text-slate-400 mb-1">
@@ -633,6 +646,7 @@ export const BoardCreatorTab: React.FC<BoardCreatorTabProps> = ({
                 </div>
               )}
 
+              {/* On-Enter Effects */}
               <div className="space-y-2 pt-2 border-t border-slate-800">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-slate-200">
@@ -742,6 +756,7 @@ export const BoardCreatorTab: React.FC<BoardCreatorTabProps> = ({
                 ))}
               </div>
 
+              {/* On-Turn-End Effects */}
               <div className="space-y-2 pt-2 border-t border-slate-800">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-slate-200">
@@ -852,6 +867,7 @@ export const BoardCreatorTab: React.FC<BoardCreatorTabProps> = ({
                 ))}
               </div>
 
+              {/* Graph / Track Edge Connections Editor */}
               {(board.topology === 'graph' || board.topology === 'track') && (
                 <div className="space-y-2 pt-2 border-t border-slate-800">
                   <div className="flex items-center gap-1.5 font-medium text-slate-200">
@@ -889,6 +905,7 @@ export const BoardCreatorTab: React.FC<BoardCreatorTabProps> = ({
           )}
         </div>
 
+        {/* Board Summary Card */}
         <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 space-y-2 text-xs">
           <div className="font-semibold text-slate-200">Board Balance Checklist</div>
           <div className="grid grid-cols-2 gap-2 text-slate-400">

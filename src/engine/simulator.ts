@@ -80,6 +80,7 @@ function buildBoardGraphCache(board: BoardConfig): BoardGraphCache {
     neighbors.set(t.id, validConns);
   }
 
+  // Multi-source BFS for distance to nearest Goal tile
   const distToGoal = computeMultiSourceBFS(board.tiles, neighbors, goalTileIds);
   const distToBoostOrShop = computeMultiSourceBFS(board.tiles, neighbors, boostShopIds);
 
@@ -99,6 +100,7 @@ function computeMultiSourceBFS(
   neighbors: Map<string, string[]>,
   sources: string[]
 ): Map<string, number> {
+  // Build reverse graph so we find distance TO sources along directed or undirected edges
   const reverseNeighbors = new Map<string, string[]>();
   for (const t of tiles) reverseNeighbors.set(t.id, []);
   for (const [u, vs] of neighbors.entries()) {
@@ -155,6 +157,7 @@ export function evaluateCustomCondition(
   if (!expr || !expr.trim()) return true;
   const trimmed = expr.trim();
 
+  // Support AND / OR clauses
   if (trimmed.includes('&&')) {
     return trimmed
       .split('&&')
@@ -166,6 +169,7 @@ export function evaluateCustomCondition(
       .some((part) => evaluateCustomCondition(part, player, round, globalVars, tile));
   }
 
+  // Check tile.type == 'xyz'
   const tileMatch = trimmed.match(/tile\.type\s*(==|!=)\s*['"]?([a-zA-Z_]+)['"]?/);
   if (tileMatch) {
     const op = tileMatch[1];
@@ -174,6 +178,7 @@ export function evaluateCustomCondition(
     return op === '==' ? actual === val : actual !== val;
   }
 
+  // Match lhs op rhs
   const match = trimmed.match(/^([a-zA-Z0-9_.]+)\s*(>=|<=|==|!=|>|<)\s*(-?\d+(?:\.\d+)?)$/);
   if (!match) return true;
   const [, lhsKey, op, rhsStr] = match;
@@ -276,7 +281,7 @@ export interface SingleSimResult {
   >;
   tileVisits: Record<string, number>;
   tileDeaths: Record<string, number>;
-  economyByRound: Record<string, number>[];
+  economyByRound: Record<string, number>[]; // index = round - 1, avg across alive players
   snapshots: ReplayTurnSnapshot[];
 }
 
@@ -341,6 +346,7 @@ export function runSingleGameSimulation(
     }
   };
 
+  // Initialize players
   const players: RuntimePlayerState[] = [];
   const cardsDrawnByPlayer: Record<string, number>[] = [];
   const cardsPlayedByPlayer: Record<string, number>[] = [];
@@ -350,6 +356,7 @@ export function runSingleGameSimulation(
     for (const s of config.playerStats) {
       initialStats[s.id] = s.initialValue;
     }
+    // Optional first-player mitigation: players after P1 get +1 on first non-HP resource stat
     if (config.turnConfig.firstPlayerAdvantageMitigation && i > 0) {
       const econStat =
         config.playerStats.find((s) => s.id === 'mana' || s.id === 'gold') ||
@@ -383,11 +390,13 @@ export function runSingleGameSimulation(
     cardsPlayedByPlayer.push({});
   }
 
+  // Initialize global variables
   const globalVars: Record<string, number> = {};
   for (const g of config.globalVars) {
     globalVars[g.id] = g.initialValue;
   }
 
+  // Build shared draw piles per deck
   const drawPiles = new Map<string, string[]>();
   const discardPiles = new Map<string, string[]>();
   const cardMap = new Map<string, CardDefinition>();
@@ -428,12 +437,14 @@ export function runSingleGameSimulation(
     }
   };
 
+  // Deal starting hands
   for (const p of players) {
     for (let h = 0; h < config.turnConfig.startingHandSize; h++) {
       drawCardForPlayer(p);
     }
   }
 
+  // Initialize Pieces
   const pieces: RuntimePieceState[] = [];
   const pieceTelemetryMap: Record<
     string,
@@ -460,6 +471,7 @@ export function runSingleGameSimulation(
     if (graphCache.anySpawnTiles.length > 0) {
       return graphCache.anySpawnTiles[(playerIndex + unitIndex) % graphCache.anySpawnTiles.length];
     }
+    // Fallback to non-obstacle tiles at opposite ends of board
     const passable = config.board.tiles.filter((t) => t.type !== 'obstacle');
     if (passable.length === 0) return config.board.tiles[0]?.id || 'tile_0_0';
     if (playerIndex === 0) return passable[0].id;
@@ -507,6 +519,7 @@ export function runSingleGameSimulation(
     }
   }
 
+  // Tracking state for simulation loop
   let winnerPlayerIndex: number | null = null;
   let winConditionName = '';
   let outcomeType: SingleSimResult['outcomeType'] = 'stalemate_timeout';
@@ -518,6 +531,7 @@ export function runSingleGameSimulation(
   const economyByRound: Record<string, number>[] = [];
   let turnEvents: string[] = [];
 
+  // Rule trigger state per turn to detect infinite loops
   let ruleTriggersThisTurn: Record<string, number> = {};
   let totalRuleCallDepthThisTurn = 0;
   const MAX_SAFE_TRIGGER_CHAIN = 35;
@@ -590,6 +604,7 @@ export function runSingleGameSimulation(
           const arch = archetypeMap.get(piece.archetypeId);
           if (arch) pieceTelemetryMap[arch.id].goalCaptures++;
         }
+        // Apply tile onEnterEffects
         for (const eff of landedTile.onEnterEffects) {
           applyEffectToPlayerOrPiece(eff, player, piece, globalVars);
         }
@@ -618,6 +633,7 @@ export function runSingleGameSimulation(
         continue;
       }
 
+      // Check condition
       let condPassed = true;
       if (rule.conditionType === 'stat_compare' && rule.conditionStatId && rule.conditionOperator) {
         const val = player.stats[rule.conditionStatId] ?? 0;
@@ -723,6 +739,7 @@ export function runSingleGameSimulation(
   const evaluateWinAndLossConditions = (isMaxTurnEnd = false): boolean => {
     if (outcomeType === 'infinite_loop') return true;
 
+    // 1. Check loss / elimination conditions first
     for (const wc of config.winConditions) {
       if (!wc.enabled || !wc.isLossCondition) continue;
       if (wc.type === 'stat_threshold' && wc.statId && wc.operator !== undefined) {
@@ -731,6 +748,7 @@ export function runSingleGameSimulation(
           const val = p.stats[wc.statId] ?? 0;
           if (compareValues(val, wc.operator, wc.targetValue ?? 0)) {
             p.eliminated = true;
+            // Also mark all their pieces dead
             for (const unit of pieces) {
               if (unit.ownerPlayerIndex === p.playerIndex) unit.alive = false;
             }
@@ -749,6 +767,7 @@ export function runSingleGameSimulation(
       return true;
     }
 
+    // 2. Check immediate victory conditions
     for (const wc of config.winConditions) {
       if (!wc.enabled || wc.isLossCondition) continue;
 
@@ -836,6 +855,7 @@ export function runSingleGameSimulation(
             bestPlayers.push(p);
           }
         }
+        // Only award win if there is a unique leader (ties count as stalemate!)
         if (bestPlayers.length === 1) {
           winnerPlayerIndex = bestPlayers[0].playerIndex;
           winConditionName = wc.name;
@@ -848,6 +868,7 @@ export function runSingleGameSimulation(
     return false;
   };
 
+  // Fire ON_GAME_START rules
   for (const p of players) {
     fireRules('ON_GAME_START', p);
   }
@@ -855,6 +876,7 @@ export function runSingleGameSimulation(
   let consecutiveZeroActionRounds = 0;
   const maxRounds = Math.max(1, Math.min(200, config.turnConfig.maxTurns));
 
+  // Main Round Loop
   for (currentRound = 1; currentRound <= maxRounds; currentRound++) {
     let actionsThisRound = 0;
 
@@ -870,6 +892,7 @@ export function runSingleGameSimulation(
       fireRules('ON_TURN_START', player);
       if (evaluateWinAndLossConditions(false)) break;
 
+      // Execute enabled Turn Phases in order
       for (const phase of config.turnConfig.phases) {
         if (!phase.enabled) continue;
         if (isLoopOrWon() || player.eliminated) {
@@ -878,11 +901,13 @@ export function runSingleGameSimulation(
 
         switch (phase.type) {
           case 'upkeep': {
+            // Stat regen
             for (const s of config.playerStats) {
               if (s.regenPerTurn !== 0) {
                 clampPlayerStat(player, s.id, (player.stats[s.id] ?? 0) + s.regenPerTurn);
               }
             }
+            // Respawn dead units whose timer expired
             for (const u of pieces) {
               if (u.ownerPlayerIndex === player.playerIndex && !u.alive && u.respawnTimer > 0) {
                 u.respawnTimer--;
@@ -950,6 +975,7 @@ export function runSingleGameSimulation(
               const card = cardMap.get(cardId);
               if (!card) break;
 
+              // Deduct cost
               if (card.costStatId && card.costAmount > 0) {
                 clampPlayerStat(
                   player,
@@ -958,6 +984,7 @@ export function runSingleGameSimulation(
                 );
               }
 
+              // Remove from hand and place in discard
               player.hand.splice(bestCardIdx, 1);
               discardPiles.get(card.deckId)?.push(card.id);
 
@@ -972,6 +999,7 @@ export function runSingleGameSimulation(
                 turnEvents.push(`${player.name} played card "${card.name}"`);
               }
 
+              // Resolve card effects
               const enemyPlayers = players.filter(
                 (ep) => ep.playerIndex !== player.playerIndex && !ep.eliminated
               );
@@ -1093,6 +1121,7 @@ export function runSingleGameSimulation(
                 const cost = Math.max(1, arch?.apCost ?? 1);
                 if (ap < cost) continue;
 
+                // Check for enemy units within attack range
                 const attackableEnemies = findAttackableEnemies(unit, arch, pieces, graphCache);
                 const shouldAttackFirst =
                   attackableEnemies.length > 0 &&
@@ -1130,6 +1159,7 @@ export function runSingleGameSimulation(
                     handlePieceDeath(target, unit);
                   }
                 } else if (phase.type !== 'combat' && (arch?.moveRange ?? 1) > 0) {
+                  // Move unit according to strategy
                   ap -= cost;
                   performedUnitAction = true;
                   actionsThisRound++;
@@ -1141,6 +1171,7 @@ export function runSingleGameSimulation(
                     player.strategy === 'rusher' || player.strategy === 'balanced'
                   );
 
+                  // Opportunistic attack if now on same tile as an enemy
                   const coLocatedEnemy = pieces.find(
                     (e) =>
                       e.ownerPlayerIndex !== player.playerIndex &&
@@ -1166,6 +1197,7 @@ export function runSingleGameSimulation(
           }
 
           case 'end_turn': {
+            // Apply onTurnEndEffects for tiles occupied by player's alive pieces
             const occupiedTiles = new Set<string>();
             for (const u of pieces) {
               if (u.ownerPlayerIndex === player.playerIndex && u.alive) {
@@ -1202,6 +1234,7 @@ export function runSingleGameSimulation(
       if (evaluateWinAndLossConditions(false)) break;
     }
 
+    // Record average player stats at end of round for economy curves
     const avgStats: Record<string, number> = {};
     const activePlayers = players.filter((p) => !p.eliminated);
     const denom = Math.max(1, activePlayers.length);
@@ -1216,6 +1249,7 @@ export function runSingleGameSimulation(
       break;
     }
 
+    // End of full round global variable update & ON_ROUND_END trigger
     for (const g of config.globalVars) {
       if (g.changePerRound !== 0) {
         const nextG = (globalVars[g.id] ?? g.initialValue) + g.changePerRound;
@@ -1238,6 +1272,7 @@ export function runSingleGameSimulation(
     }
   }
 
+  // If max turns reached without winner, check max-turn tiebreakers
   if (winnerPlayerIndex === null && outcomeType === 'stalemate_timeout') {
     evaluateWinAndLossConditions(true);
     if (winnerPlayerIndex === null) {
@@ -1283,7 +1318,7 @@ function chooseBestNextTile(
     const tile = graphCache.tileMap.get(cid);
     if (!tile) continue;
 
-    let score = (Math.random() - 0.5) * 0.4;
+    let score = (Math.random() - 0.5) * 0.4; // slight tie-breaking jitter
 
     const dGoal = graphCache.distToGoal.get(cid) ?? 50;
     const dResource = graphCache.distToBoostOrShop.get(cid) ?? 50;
@@ -1308,6 +1343,7 @@ function chooseBestNextTile(
       if (tile.type === 'hazard') score -= 25;
       if (tile.type === 'boost') score += 10;
     } else {
+      // balanced
       score -= dGoal * 2.5;
       score -= dResource * 1.0;
       if (tile.type === 'goal') score += 16;
@@ -1364,15 +1400,18 @@ function selectCardToPlay(
     const card = cardMap.get(cid);
     if (!card) continue;
 
+    // Check resource affordability
     if (card.costStatId && card.costAmount > 0) {
       const avail = player.stats[card.costStatId] ?? 0;
       if (avail < card.costAmount) continue;
     }
 
+    // Check custom condition
     if (!evaluateCustomCondition(card.conditionExpr, player, round, globalVars)) {
       continue;
     }
 
+    // Check target availability
     if (card.targetType === 'enemy_piece') {
       const hasEnemyPiece = allPieces.some(
         (u) => u.ownerPlayerIndex !== player.playerIndex && u.alive
@@ -1412,6 +1451,7 @@ function selectTargetEnemyPlayer(
   if (strategy === 'random') {
     return enemies[Math.floor(Math.random() * enemies.length)];
   }
+  // Target leader in VP or lowest HP
   return [...enemies].sort((a, b) => {
     const vpDiff = (b.stats['vp'] ?? 0) - (a.stats['vp'] ?? 0);
     if (vpDiff !== 0) return vpDiff;
@@ -1502,6 +1542,7 @@ export async function runMonteCarloBatch(
         )
       : undefined;
 
+    // Record full turn snapshots for first 25 games or when searching for notable replays
     const shouldRecordLog =
       i < 20 || fastestWinLog === null || anomalyGameLog === null;
 
@@ -1515,6 +1556,7 @@ export async function runMonteCarloBatch(
       offendingLoopRule = res.offendingRuleName;
     }
 
+    // Seat & Strategy stats
     for (let s = 0; s < playerCount; s++) {
       const strat = res.playerStrategies[s];
       winsByStrategy[strat].games++;
@@ -1524,6 +1566,7 @@ export async function runMonteCarloBatch(
       }
     }
 
+    // Card stats
     for (const c of config.cards) {
       const entry = cardAgg.get(c.id)!;
       for (let s = 0; s < playerCount; s++) {
@@ -1540,6 +1583,7 @@ export async function runMonteCarloBatch(
       }
     }
 
+    // Piece stats
     for (const p of config.pieces) {
       const pe = pieceAgg.get(p.id)!;
       const rPe = res.pieceStats[p.id];
@@ -1552,6 +1596,7 @@ export async function runMonteCarloBatch(
       }
     }
 
+    // Board heatmap
     for (const [tid, v] of Object.entries(res.tileVisits)) {
       tileVisits[tid] = (tileVisits[tid] || 0) + v;
     }
@@ -1559,6 +1604,7 @@ export async function runMonteCarloBatch(
       tileDeaths[tid] = (tileDeaths[tid] || 0) + d;
     }
 
+    // Economy curve aggregation
     for (let r = 0; r < res.economyByRound.length && r < maxRounds; r++) {
       economyCountByRound[r]++;
       for (const [statId, val] of Object.entries(res.economyByRound[r])) {
@@ -1566,6 +1612,7 @@ export async function runMonteCarloBatch(
       }
     }
 
+    // Save notable game replays
     if (res.snapshots.length > 0) {
       const logObj: SimulatedGameLog = {
         gameIndex: i + 1,
@@ -1613,6 +1660,7 @@ export async function runMonteCarloBatch(
 
   onProgress?.(totalGames, totalGames);
 
+  // Compute finalized metrics
   const winRatesBySeat = winsBySeat.map((w) => w / Math.max(1, totalGames));
   for (const strat of ALL_STRATEGIES) {
     const st = winsByStrategy[strat];
@@ -1627,6 +1675,7 @@ export async function runMonteCarloBatch(
   const maxObsRounds = sortedRounds[sortedRounds.length - 1] || 0;
   const p90Rounds = sortedRounds[Math.floor(sortedRounds.length * 0.9)] || 0;
 
+  // Build 6 histogram buckets
   const bucketCount = 6;
   const bucketSpan = Math.max(1, Math.ceil(maxRounds / bucketCount));
   const roundHistogram = Array.from({ length: bucketCount }, (_, idx) => {
@@ -1698,6 +1747,7 @@ export async function runMonteCarloBatch(
     notableGames.push(longestGameLog);
   }
 
+  // Run Automated Diagnostic Issue & Hole Detector
   const { issues, healthScore } = analyzeDiagnosticIssues(
     config,
     totalGames,
@@ -1759,6 +1809,7 @@ function analyzeDiagnosticIssues(
   const playerCount = Math.max(1, config.turnConfig.playerCount);
   const expectedWinRate = 1 / playerCount;
 
+  // 1. Check Infinite Rule Loops (Critical)
   const loopRate = outcomeCounts.infinite_loop / totalGames;
   if (outcomeCounts.infinite_loop > 0) {
     penalty += Math.min(45, Math.round(loopRate * 60) + 20);
@@ -1817,6 +1868,7 @@ function analyzeDiagnosticIssues(
     });
   }
 
+  // 2. Check Dead Cards / Unplayable Resource Costs (Critical / Warning)
   for (const ct of cardTelemetry) {
     const cardDef = config.cards.find((c) => c.id === ct.cardId);
     if (!cardDef) continue;
@@ -1897,6 +1949,7 @@ function analyzeDiagnosticIssues(
     }
   }
 
+  // 3. Check Overpowered Cards (Warning / Critical)
   for (const ct of cardTelemetry) {
     if (ct.gamesWherePlayed >= Math.max(15, totalGames * 0.05) && ct.winRateDelta > 0.14) {
       const cardDef = config.cards.find((c) => c.id === ct.cardId);
@@ -1950,6 +2003,7 @@ function analyzeDiagnosticIssues(
     }
   }
 
+  // 4. Check Stalemate / Timeout Rate
   const stalemateRate =
     (outcomeCounts.stalemate_timeout + outcomeCounts.deadlock_no_moves) / totalGames;
   if (stalemateRate > 0.12) {
@@ -2002,6 +2056,7 @@ function analyzeDiagnosticIssues(
     });
   }
 
+  // 5. Check First-Player Bias (Seat 1 Advantage)
   if (playerCount >= 2 && outcomeCounts.win > totalGames * 0.3) {
     const p1WinRate = winRatesBySeat[0] || 0;
     const seatBias = p1WinRate - expectedWinRate;
@@ -2040,6 +2095,7 @@ function analyzeDiagnosticIssues(
     }
   }
 
+  // 6. Check Unreachable / Unvisited Board Tiles
   const passableTiles = config.board.tiles.filter((t) => t.type !== 'obstacle');
   const unvisitedTiles = passableTiles.filter((t) => (tileVisits[t.id] || 0) === 0);
   if (unvisitedTiles.length > passableTiles.length * 0.35 && passableTiles.length > 4) {
@@ -2070,6 +2126,7 @@ function analyzeDiagnosticIssues(
     });
   }
 
+  // 7. Check Premature / Degenerate Early Turn Wins
   if (minRounds <= 2 && outcomeCounts.win > 0 && avgRounds < 4.5) {
     penalty += 14;
     issues.push({
