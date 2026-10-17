@@ -139,6 +139,9 @@
   - **Space Visitation Heatmap**: Overlays tile traffic intensity across all simulated games.
   - **Unit Death Heatmap**: Highlights choke-points where units are most frequently defeated.
   - **JSON Telemetry Export**: Export full simulation reports as `.json`.
+- **Optional Auto-Balancer / Parameter Sweep (`src/engine/autoBalancer.ts`)**:
+  - Collapsed by default so it stays out of the way until needed (`Auto-Balancer (Optional)` button in the Simulation Studio bar).
+  - Set target game length (min/max rounds), Seat 1 win-rate tolerance ($\pm 3\%$, $\pm 5\%$, $\pm 8\%$), and allowed tuning levers (Victory Thresholds, Card Costs, Economy Regen/Catch-Up, Unit HP/Attack, Loop Caps), then sweep candidate rule configurations (250–1,000 games each) to surface and apply the **Top 3 Most Balanced Rule Configurations**.
 
 ---
 

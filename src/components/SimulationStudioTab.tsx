@@ -17,12 +17,21 @@ import {
   Layers,
   Shield,
   RefreshCw,
+  Sliders,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
 } from 'lucide-react';
 import {
   DiagnosticPatch,
   GameConfig,
   SimulationBatchSummary,
 } from '../types/game';
+import {
+  AutoTuneCandidateResult,
+  AutoTuneGoals,
+  runParameterSweepAutoBalancer,
+} from '../engine/autoBalancer';
 import { BoardVisualizer } from './BoardVisualizer';
 
 interface SimulationStudioTabProps {
@@ -58,6 +67,26 @@ export const SimulationStudioTab: React.FC<SimulationStudioTabProps> = ({
   const [isAutoPlayingReplay, setIsAutoPlayingReplay] = useState<boolean>(false);
   const [replaySpeedMs, setReplaySpeedMs] = useState<number>(1200);
   const [showFullGameLog, setShowFullGameLog] = useState<boolean>(true);
+
+  // Optional Auto-Balancer / Parameter Sweep state (collapsed by default)
+  const [showAutoTuner, setShowAutoTuner] = useState<boolean>(false);
+  const [isSweeping, setIsSweeping] = useState<boolean>(false);
+  const [sweepProgressText, setSweepProgressText] = useState<string>('');
+  const [sweepResults, setSweepResults] = useState<AutoTuneCandidateResult[]>(
+    []
+  );
+  const [autoTuneGoals, setAutoTuneGoals] = useState<AutoTuneGoals>({
+    targetMinRounds: 8,
+    targetMaxRounds: 15,
+    maxSeatBiasDelta: 0.05,
+    maxStalemateRate: 0.02,
+    gamesPerCandidate: 500,
+    tuneWinThresholds: true,
+    tuneCardCosts: true,
+    tuneEconomyAndCatchup: true,
+    tuneUnitStats: true,
+    fixUncappedLoops: true,
+  });
 
   const activeReplay =
     simResult?.notableGames[selectedReplayIdx] ||
@@ -100,6 +129,27 @@ export const SimulationStudioTab: React.FC<SimulationStudioTabProps> = ({
     a.download = `${config.name.toLowerCase().replace(/\s+/g, '_')}_sim_report.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleRunAutoSweep = async () => {
+    if (isSweeping || isRunning) return;
+    setIsSweeping(true);
+    setSweepResults([]);
+    try {
+      const top3 = await runParameterSweepAutoBalancer(
+        config,
+        autoTuneGoals,
+        (curr, total, label) => {
+          setSweepProgressText(
+            `Sweeping candidate ${curr}/${total}: ${label} (${autoTuneGoals.gamesPerCandidate} games)...`
+          );
+        }
+      );
+      setSweepResults(top3);
+    } finally {
+      setIsSweeping(false);
+      setSweepProgressText('');
+    }
   };
 
   const expectedSeatWinRate = 1 / Math.max(1, config.turnConfig.playerCount);
@@ -168,10 +218,29 @@ export const SimulationStudioTab: React.FC<SimulationStudioTabProps> = ({
             )}
           </button>
 
+          {/* Optional Auto-Balancer Toggle Button */}
+          <button
+            onClick={() => setShowAutoTuner((prev) => !prev)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-colors cursor-pointer ${
+              showAutoTuner
+                ? 'bg-purple-950/70 border-purple-500/50 text-purple-200'
+                : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800'
+            }`}
+            title="Optional Tool: Sweep parameters to find the Top 3 Most Balanced Rule Configurations"
+          >
+            <Sliders className="w-3.5 h-3.5 text-purple-400" />
+            <span>Auto-Balancer (Optional)</span>
+            {showAutoTuner ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </button>
+
           {simResult && (
             <button
               onClick={handleExportReport}
-              className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium border border-slate-700"
+              className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium border border-slate-700 cursor-pointer"
               title="Export Full Simulation Telemetry JSON"
             >
               <Download className="w-3.5 h-3.5" /> Export Report
@@ -179,6 +248,285 @@ export const SimulationStudioTab: React.FC<SimulationStudioTabProps> = ({
           )}
         </div>
       </div>
+
+      {/* Optional Collapsible Auto-Balancer / Parameter Sweep Drawer */}
+      {showAutoTuner && (
+        <div className="bg-slate-900/95 border border-purple-500/40 rounded-xl p-5 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-purple-400" />
+                Optional Auto-Tune Optimizer & Parameter Sweep
+              </h3>
+              <p className="text-xs text-slate-400">
+                Set your target game pacing and fairness goals — sweeps across candidate rule adjustments and surfaces the Top 3 Most Balanced Configurations.
+              </p>
+            </div>
+            <button
+              onClick={handleRunAutoSweep}
+              disabled={isSweeping || isRunning}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow cursor-pointer"
+            >
+              {isSweeping ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>{sweepProgressText || 'Running Parameter Sweep...'}</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>
+                    Sweep & Find Top 3 Configurations ({autoTuneGoals.gamesPerCandidate} games/ea)
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Target Goals & Tunable Levers */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 text-xs">
+            <div className="lg:col-span-6 grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950 p-3.5 rounded-xl border border-slate-800">
+              <div>
+                <label className="block text-slate-400 mb-1">
+                  Min Target Rounds
+                </label>
+                <input
+                  type="number"
+                  min={2}
+                  max={50}
+                  value={autoTuneGoals.targetMinRounds}
+                  onChange={(e) =>
+                    setAutoTuneGoals({
+                      ...autoTuneGoals,
+                      targetMinRounds: Math.max(1, parseInt(e.target.value, 10) || 8),
+                    })
+                  }
+                  className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-semibold"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-400 mb-1">
+                  Max Target Rounds
+                </label>
+                <input
+                  type="number"
+                  min={3}
+                  max={100}
+                  value={autoTuneGoals.targetMaxRounds}
+                  onChange={(e) =>
+                    setAutoTuneGoals({
+                      ...autoTuneGoals,
+                      targetMaxRounds: Math.max(2, parseInt(e.target.value, 10) || 15),
+                    })
+                  }
+                  className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-semibold"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-400 mb-1">
+                  Seat 1 Bias Tol.
+                </label>
+                <select
+                  value={autoTuneGoals.maxSeatBiasDelta}
+                  onChange={(e) =>
+                    setAutoTuneGoals({
+                      ...autoTuneGoals,
+                      maxSeatBiasDelta: parseFloat(e.target.value),
+                    })
+                  }
+                  className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-semibold"
+                >
+                  <option value={0.03}>±3% (Strict)</option>
+                  <option value={0.05}>±5% (Standard)</option>
+                  <option value={0.08}>±8% (Relaxed)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-slate-400 mb-1">
+                  Games / Candidate
+                </label>
+                <select
+                  value={autoTuneGoals.gamesPerCandidate}
+                  onChange={(e) =>
+                    setAutoTuneGoals({
+                      ...autoTuneGoals,
+                      gamesPerCandidate: parseInt(e.target.value, 10),
+                    })
+                  }
+                  className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-100 font-semibold"
+                >
+                  <option value={250}>250 Games (Fast)</option>
+                  <option value={500}>500 Games (Standard)</option>
+                  <option value={1000}>1,000 Games (Deep)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="lg:col-span-6 bg-slate-950 p-3.5 rounded-xl border border-slate-800 flex flex-wrap items-center gap-3">
+              <span className="text-slate-400 font-semibold w-full">
+                Allowed Parameters to Sweep:
+              </span>
+              <label className="flex items-center gap-1.5 text-slate-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoTuneGoals.tuneWinThresholds}
+                  onChange={(e) =>
+                    setAutoTuneGoals({
+                      ...autoTuneGoals,
+                      tuneWinThresholds: e.target.checked,
+                    })
+                  }
+                />
+                <span>Victory Thresholds & Tiebreakers</span>
+              </label>
+              <label className="flex items-center gap-1.5 text-slate-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoTuneGoals.tuneCardCosts}
+                  onChange={(e) =>
+                    setAutoTuneGoals({
+                      ...autoTuneGoals,
+                      tuneCardCosts: e.target.checked,
+                    })
+                  }
+                />
+                <span>Card Costs & Effects</span>
+              </label>
+              <label className="flex items-center gap-1.5 text-slate-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoTuneGoals.tuneEconomyAndCatchup}
+                  onChange={(e) =>
+                    setAutoTuneGoals({
+                      ...autoTuneGoals,
+                      tuneEconomyAndCatchup: e.target.checked,
+                    })
+                  }
+                />
+                <span>Economy Regen & P2 Catch-Up</span>
+              </label>
+              <label className="flex items-center gap-1.5 text-slate-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoTuneGoals.tuneUnitStats}
+                  onChange={(e) =>
+                    setAutoTuneGoals({
+                      ...autoTuneGoals,
+                      tuneUnitStats: e.target.checked,
+                    })
+                  }
+                />
+                <span>Unit HP & Attack</span>
+              </label>
+              <label className="flex items-center gap-1.5 text-slate-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoTuneGoals.fixUncappedLoops}
+                  onChange={(e) =>
+                    setAutoTuneGoals({
+                      ...autoTuneGoals,
+                      fixUncappedLoops: e.target.checked,
+                    })
+                  }
+                />
+                <span>Cap Infinite Trigger Loops</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Top 3 Candidate Results */}
+          {sweepResults.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+              {sweepResults.map((cand) => {
+                const p1WinPct = (
+                  (cand.summary.winRatesBySeat[0] || 0) * 100
+                ).toFixed(1);
+                const stalePct = (
+                  ((cand.summary.outcomeCounts.infinite_loop +
+                    cand.summary.outcomeCounts.stalemate_timeout) /
+                    Math.max(1, cand.summary.totalGames)) *
+                  100
+                ).toFixed(1);
+
+                return (
+                  <div
+                    key={cand.id}
+                    className="bg-slate-950 border border-purple-500/30 rounded-xl p-4 flex flex-col justify-between space-y-3 text-xs"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold text-[11px]">
+                          #{cand.rank} Recommended Config
+                        </span>
+                        <span className="font-mono font-bold text-emerald-400">
+                          Fitness: {cand.fitnessScore}/100 (Health{' '}
+                          {cand.summary.healthScore})
+                        </span>
+                      </div>
+
+                      <h4 className="font-bold text-slate-100 text-sm">
+                        {cand.label}
+                      </h4>
+
+                      <div className="grid grid-cols-3 gap-1.5 bg-slate-900 p-2 rounded-lg border border-slate-800 text-[11px] font-mono">
+                        <div>
+                          <div className="text-slate-400">Avg Length</div>
+                          <div className="text-slate-100 font-bold">
+                            {cand.summary.avgRounds}r
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-slate-400">P1 Win%</div>
+                          <div className="text-indigo-300 font-bold">
+                            {p1WinPct}%
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-slate-400">Stale/Loop</div>
+                          <div className="text-emerald-400 font-bold">
+                            {stalePct}%
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1 text-[11px] text-slate-300">
+                        <div className="font-semibold text-slate-400">
+                          Swept Parameter Changes:
+                        </div>
+                        {cand.changes.map((ch, idx) => (
+                          <div key={idx} className="leading-snug">
+                            • {ch}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() =>
+                        onApplyPatchAndSimulate(
+                          {
+                            id: cand.id,
+                            label: `Auto-Tune #${cand.rank}: ${cand.label}`,
+                            description: cand.changes.join('; '),
+                            category: 'rule',
+                            apply: () => cand.config,
+                          },
+                          simCount,
+                          randomizeStrategies
+                        )
+                      }
+                      className="w-full py-2 px-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Wrench className="w-3.5 h-3.5" />
+                      <span>Apply Config #{cand.rank} & Simulate</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Progress Bar when running */}
       {isRunning && (
