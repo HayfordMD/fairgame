@@ -56,6 +56,8 @@ export const SimulationStudioTab: React.FC<SimulationStudioTabProps> = ({
   const [selectedReplayIdx, setSelectedReplayIdx] = useState<number>(0);
   const [replayStepIdx, setReplayStepIdx] = useState<number>(0);
   const [isAutoPlayingReplay, setIsAutoPlayingReplay] = useState<boolean>(false);
+  const [replaySpeedMs, setReplaySpeedMs] = useState<number>(1200);
+  const [showFullGameLog, setShowFullGameLog] = useState<boolean>(true);
 
   const activeReplay =
     simResult?.notableGames[selectedReplayIdx] ||
@@ -83,9 +85,9 @@ export const SimulationStudioTab: React.FC<SimulationStudioTabProps> = ({
         }
         return prev + 1;
       });
-    }, 650);
+    }, replaySpeedMs);
     return () => clearInterval(timer);
-  }, [isAutoPlayingReplay, activeReplay]);
+  }, [isAutoPlayingReplay, activeReplay, replaySpeedMs]);
 
   const handleExportReport = () => {
     if (!simResult) return;
@@ -922,14 +924,14 @@ export const SimulationStudioTab: React.FC<SimulationStudioTabProps> = ({
                 {/* Timeline Scrubber */}
                 {activeReplay && (
                   <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => {
                             setIsAutoPlayingReplay(false);
                             setReplayStepIdx((p) => Math.max(0, p - 1));
                           }}
-                          className="p-1.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700"
+                          className="p-1.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 cursor-pointer"
                         >
                           <SkipBack className="w-4 h-4" />
                         </button>
@@ -937,7 +939,7 @@ export const SimulationStudioTab: React.FC<SimulationStudioTabProps> = ({
                           onClick={() =>
                             setIsAutoPlayingReplay(!isAutoPlayingReplay)
                           }
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-semibold cursor-pointer"
                         >
                           {isAutoPlayingReplay ? (
                             <>
@@ -945,7 +947,7 @@ export const SimulationStudioTab: React.FC<SimulationStudioTabProps> = ({
                             </>
                           ) : (
                             <>
-                              <Play className="w-3.5 h-3.5" /> Auto-Step
+                              <Play className="w-3.5 h-3.5" /> Auto-Play Logs
                             </>
                           )}
                         </button>
@@ -956,10 +958,23 @@ export const SimulationStudioTab: React.FC<SimulationStudioTabProps> = ({
                               Math.min(activeReplay.snapshots.length - 1, p + 1)
                             );
                           }}
-                          className="p-1.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700"
+                          className="p-1.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 cursor-pointer"
                         >
                           <SkipForward className="w-4 h-4" />
                         </button>
+
+                        <select
+                          value={replaySpeedMs}
+                          onChange={(e) =>
+                            setReplaySpeedMs(parseInt(e.target.value, 10))
+                          }
+                          className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[11px] text-slate-200 font-semibold"
+                          title="Replay & Log Printing Speed"
+                        >
+                          <option value={1500}>🐢 Slow (1.5s)</option>
+                          <option value={800}>🚶 Normal (0.8s)</option>
+                          <option value={300}>⚡ Fast (0.3s)</option>
+                        </select>
                       </div>
 
                       <span className="font-mono text-slate-300">
@@ -1024,14 +1039,89 @@ export const SimulationStudioTab: React.FC<SimulationStudioTabProps> = ({
                   </div>
                 )}
 
-                {/* Turn Action & Trigger Log */}
-                {activeSnapshot && (
+                {/* Turn Action & Trigger Log (Full Single-Game Transcript or Current Step) */}
+                {activeReplay && activeSnapshot && (
                   <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2">
-                    <div className="font-semibold text-slate-200">
-                      Turn Action & Rule Trigger Log
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-semibold text-slate-200">
+                        Single-Game Action & Rule Trigger Log
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px]">
+                        <button
+                          onClick={() => setShowFullGameLog(true)}
+                          className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
+                            showFullGameLog
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-slate-900 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          Full Game ({activeReplay.snapshots.length} Turns)
+                        </button>
+                        <button
+                          onClick={() => setShowFullGameLog(false)}
+                          className={`px-2 py-0.5 rounded font-semibold cursor-pointer ${
+                            !showFullGameLog
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-slate-900 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          Step {replayStepIdx + 1} Only
+                        </button>
+                      </div>
                     </div>
-                    <div className="max-h-48 overflow-y-auto space-y-1 font-mono text-[11px]">
-                      {activeSnapshot.events.length === 0 ? (
+
+                    <div className="max-h-60 overflow-y-auto space-y-1.5 font-mono text-[11px]">
+                      {showFullGameLog ? (
+                        activeReplay.snapshots.map((snap, sIdx) => {
+                          const isCurrentStep = sIdx === replayStepIdx;
+                          return (
+                            <div
+                              key={sIdx}
+                              onClick={() => {
+                                setIsAutoPlayingReplay(false);
+                                setReplayStepIdx(sIdx);
+                              }}
+                              className={`p-2 rounded-lg border cursor-pointer transition-colors ${
+                                isCurrentStep
+                                  ? 'bg-indigo-950/60 border-indigo-400'
+                                  : 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between text-[10px] text-indigo-300 font-bold mb-1">
+                                <span>
+                                  [Step {sIdx + 1}] Round {snap.round} • Player{' '}
+                                  {snap.activePlayerIndex + 1}'s Turn
+                                </span>
+                                {isCurrentStep && (
+                                  <span className="px-1.5 py-0.2 rounded bg-indigo-500/30 text-indigo-200">
+                                    VIEWING
+                                  </span>
+                                )}
+                              </div>
+                              {snap.events.length === 0 ? (
+                                <div className="text-slate-500 italic">
+                                  • Upkeep / Draw (No unit or card actions)
+                                </div>
+                              ) : (
+                                snap.events.map((ev, eIdx) => (
+                                  <div
+                                    key={eIdx}
+                                    className={`py-0.5 ${
+                                      ev.includes('CRITICAL LOOP')
+                                        ? 'text-rose-300 font-bold'
+                                        : ev.includes('Rule Triggered')
+                                        ? 'text-amber-300'
+                                        : 'text-slate-200'
+                                    }`}
+                                  >
+                                    • {ev}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          );
+                        })
+                      ) : activeSnapshot.events.length === 0 ? (
                         <div className="text-slate-500 italic">
                           No special events logged on this step.
                         </div>

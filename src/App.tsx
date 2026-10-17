@@ -11,6 +11,7 @@ import {
   Play,
   Sparkles,
   AlertOctagon,
+  Gamepad2,
 } from 'lucide-react';
 import {
   DiagnosticPatch,
@@ -25,8 +26,15 @@ import { PiecesAndStatsTab } from './components/PiecesAndStatsTab';
 import { CardsAndDecksTab } from './components/CardsAndDecksTab';
 import { RulesAndTurnsTab } from './components/RulesAndTurnsTab';
 import { SimulationStudioTab } from './components/SimulationStudioTab';
+import { PlaytestTableTab } from './components/PlaytestTableTab';
 
-type StudioTab = 'board' | 'pieces_stats' | 'cards' | 'rules_turns' | 'simulation';
+type StudioTab =
+  | 'board'
+  | 'pieces_stats'
+  | 'cards'
+  | 'rules_turns'
+  | 'simulation'
+  | 'playtest';
 
 export function App() {
   const [config, setConfig] = useState<GameConfig>(() => {
@@ -268,6 +276,14 @@ export function App() {
             </button>
 
             <button
+              onClick={() => setActiveTab('playtest')}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow cursor-pointer"
+            >
+              <Gamepad2 className="w-3.5 h-3.5" />
+              <span>Human Playtest & Slow Logs</span>
+            </button>
+
+            <button
               onClick={() => {
                 setActiveTab('simulation');
                 handleRunSimulation(1000, true);
@@ -318,6 +334,12 @@ export function App() {
                 Icon: Flame,
                 badgeCount: totalIssuesCount,
                 hasCritical: criticalIssuesCount > 0,
+              },
+              {
+                id: 'playtest',
+                label: '6. Human Playtest & Slow Logs',
+                sub: 'Play Every Turn • Single-Game Log',
+                Icon: Gamepad2,
               },
             ] as const
           ).map((tab) => {
@@ -415,6 +437,8 @@ export function App() {
             onApplyPatchAndSimulate={handleApplyPatchAndSimulate}
           />
         )}
+
+        {activeTab === 'playtest' && <PlaytestTableTab config={config} />}
       </main>
     </div>
   );

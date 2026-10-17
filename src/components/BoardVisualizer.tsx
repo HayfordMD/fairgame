@@ -91,6 +91,10 @@ interface BoardVisualizerProps {
   onPaintTile?: (tile: BoardTile) => void;
   onMoveGraphNode?: (tileId: string, newX: number, newY: number) => void;
   pieces?: RuntimePieceState[];
+  selectedPieceId?: string | null;
+  onSelectPiece?: (piece: RuntimePieceState) => void;
+  highlightedMoveTileIds?: string[];
+  highlightedAttackTileIds?: string[];
   heatmapValues?: Record<string, number>;
   heatmapMode?: 'none' | 'visits' | 'deaths';
   interactivePaint?: boolean;
@@ -103,6 +107,10 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
   onPaintTile,
   onMoveGraphNode,
   pieces = [],
+  selectedPieceId = null,
+  onSelectPiece,
+  highlightedMoveTileIds = [],
+  highlightedAttackTileIds = [],
   heatmapValues,
   heatmapMode = 'none',
   interactivePaint = false,
@@ -110,6 +118,8 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [isMouseDown, setIsMouseDown] = useState(false);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+  const moveHighlightSet = new Set(highlightedMoveTileIds);
+  const attackHighlightSet = new Set(highlightedAttackTileIds);
 
   const viewBoxWidth = 1000;
   const viewBoxHeight = 1000;
@@ -345,9 +355,21 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
           const { cx, cy, radius } = center;
           const meta = TILE_TYPE_META[t.type] || TILE_TYPE_META.normal;
           const isSelected = selectedTileId === t.id;
+          const isMoveTarget = moveHighlightSet.has(t.id);
+          const isAttackTarget = attackHighlightSet.has(t.id);
           const heatColor = getHeatmapOverlayColor(t.id);
           const heatVal = heatmapValues?.[t.id] ?? 0;
           const tilePieces = piecesByTile.get(t.id) || [];
+
+          const strokeColor = isAttackTarget
+            ? '#f43f5e'
+            : isMoveTarget
+            ? '#34d399'
+            : isSelected
+            ? '#f8fafc'
+            : meta.strokeHex;
+          const strokeW =
+            isAttackTarget || isMoveTarget || isSelected ? 4.5 : 2;
 
           const handleTileMouseDown = (e: React.PointerEvent) => {
             e.stopPropagation();
@@ -384,15 +406,15 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
                   height={radius * 2}
                   rx={8}
                   fill={heatColor || t.color || meta.bgHex}
-                  stroke={isSelected ? '#f8fafc' : meta.strokeHex}
-                  strokeWidth={isSelected ? 4 : 2}
+                  stroke={strokeColor}
+                  strokeWidth={strokeW}
                 />
               ) : board.topology === 'hex_grid' ? (
                 <polygon
                   points={buildHexPolygonPoints(cx, cy, radius)}
                   fill={heatColor || t.color || meta.bgHex}
-                  stroke={isSelected ? '#f8fafc' : meta.strokeHex}
-                  strokeWidth={isSelected ? 4 : 2}
+                  stroke={strokeColor}
+                  strokeWidth={strokeW}
                 />
               ) : (
                 <circle
@@ -400,8 +422,31 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
                   cy={cy}
                   r={radius}
                   fill={heatColor || t.color || meta.bgHex}
-                  stroke={isSelected ? '#f8fafc' : meta.strokeHex}
-                  strokeWidth={isSelected ? 4 : 3}
+                  stroke={strokeColor}
+                  strokeWidth={strokeW}
+                />
+              )}
+
+              {/* Legal Move / Attack Highlight Overlay */}
+              {isMoveTarget && (
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={radius * 0.48}
+                  fill="rgba(16, 185, 129, 0.22)"
+                  stroke="#34d399"
+                  strokeWidth="2.5"
+                  strokeDasharray="5 3"
+                />
+              )}
+              {isAttackTarget && (
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={radius * 0.68}
+                  fill="rgba(244, 63, 94, 0.24)"
+                  stroke="#fb7185"
+                  strokeWidth="3"
                 />
               )}
 
@@ -464,16 +509,37 @@ export const BoardVisualizer: React.FC<BoardVisualizerProps> = ({
                 const px = cx + Math.cos(offsetAngle) * spread;
                 const py = cy - 4 + Math.sin(offsetAngle) * spread;
                 const pColor = PLAYER_COLORS[piece.ownerPlayerIndex % PLAYER_COLORS.length];
+                const isPieceSelected = selectedPieceId === piece.instanceId;
 
                 return (
-                  <g key={piece.instanceId}>
+                  <g
+                    key={piece.instanceId}
+                    onPointerDown={(e) => {
+                      if (onSelectPiece && !isAttackTarget && !isMoveTarget) {
+                        e.stopPropagation();
+                        onSelectPiece(piece);
+                        onSelectTile?.(t);
+                      }
+                    }}
+                  >
+                    {isPieceSelected && (
+                      <circle
+                        cx={px}
+                        cy={py}
+                        r={Math.max(19, radius * 0.56)}
+                        fill="none"
+                        stroke="#fbbf24"
+                        strokeWidth="3.5"
+                        strokeDasharray="5 3"
+                      />
+                    )}
                     <circle
                       cx={px}
                       cy={py}
                       r={Math.max(14, radius * 0.44)}
                       fill={pColor}
-                      stroke="#ffffff"
-                      strokeWidth="2.5"
+                      stroke={isPieceSelected ? '#fde047' : '#ffffff'}
+                      strokeWidth={isPieceSelected ? '3.5' : '2.5'}
                     />
                     <text
                       x={px}

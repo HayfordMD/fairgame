@@ -142,7 +142,23 @@
 
 ---
 
-### 6. Built-In Presets & Universal Import / Export (`src/data/presets.ts` & `src/utils/importers.ts`)
+### 6. Interactive Human Playtest & Single-Game Slow Log Streamer (`src/components/PlaytestTableTab.tsx` & `src/engine/liveMatchEngine.ts`)
+- **Play Every Turn Yourself or Mix Human & AI Seats**:
+  - **All Human (Hotseat Mode)**: Every seat (`Player 1` .. `Player N`) is controlled by a person so you can play out each turn and phase manually.
+  - **Human vs. AI Bots**: Play as `Player 1` while AI seats execute their turns step-by-step at your selected log speed.
+  - **Watch Single Game (Slow-Mo AI Logs)**: Watch AI bots play a single game from Round 1 to completion while printing out every action slowly.
+  - **Per-Seat Toggle**: Click any player's seat badge (`👤 Human` / `🤖 AI`) at any moment mid-game to take over or hand off control.
+- **Interactive Turn & Board Controls**:
+  - Click any friendly unit on the board (outlined in gold) to highlight **valid move spaces in glowing green** and **attackable enemy spaces in glowing red**.
+  - Click a highlighted space to move or attack on the board, roll dice (`NdS`) in `roll_and_move` phases, play cards directly from the active player's hand, and advance through each turn phase (`Upkeep` → `Draw` → `Play Cards` → `Action Points` → `End Turn`).
+- **Full Single-Game Play-by-Play Slow-Log Console**:
+  - Prints every single action, dice roll, card draw, card play, movement path, combat damage formula (`ATK - ⌊DEF × 0.5⌋`), space effect, and `WHEN ... IF ... THEN ...` rule trigger with before/after stat deltas.
+  - Adjustable streaming speeds: **Very Slow (`1.8s / action`)**, **Slow Logs (`1.0s / action`)**, **Normal (`0.55s / action`)**, **Fast (`0.22s / action`)**, or **Manual Step (`Step 1 Action`)**.
+  - Filter logs by category (`All`, `⚡ Rules & Spaces`, `🃏 Cards & Draws`, `⚔️ Moves & Combat`, `🕒 Turns & Phases`), copy the full single-game transcript to the clipboard, or download it as a `.txt` file.
+
+---
+
+### 7. Built-In Presets & Universal Import / Export (`src/data/presets.ts` & `src/utils/importers.ts`)
 - **3 Built-In Game Presets** accessible from the top header bar:
   1. **Relic Conquest (Balanced Tactical Arena)** — $6 \times 6$ Square Grid tactical skirmish & relic race (Health Score ~92–100).
   2. **Broken Loop Lab ( Intentional Flaws Demo)** — $7 \times 5$ Square Grid with 3 intentional game-breaking flaws (an infinite `ON_LAND_TILE` warp loop, an unpayable 9-Mana *Forbidden Cataclysm* card when Max Mana is 6, and an overpowered 1-Mana *Sovereign Decree* card) so you can watch the simulator catch all 3 issues and fix them in one click.
@@ -169,16 +185,18 @@ fairgame/
 │   ├── data/
 │   │   └── presets.ts                    # 3 built-in tabletop game presets + board topology generators
 │   ├── engine/
-│   │   └── simulator.ts                  # Monte Carlo simulation engine, AI decision scorer, flaw detector, & patcher
+│   │   ├── simulator.ts                  # Monte Carlo simulation engine, AI decision scorer, flaw detector, & patcher
+│   │   └── liveMatchEngine.ts            # Interactive turn-by-turn Human/AI match engine & atomic slow-log streamer
 │   ├── utils/
 │   │   └── importers.ts                  # Parsers for CSV cards/pieces/stats, ASCII boards, JSON packs, & Rule DSL
 │   └── components/
-│       ├── BoardVisualizer.tsx           # Interactive SVG renderer for Square, Hex, Track, & Graph boards + heatmaps
+│       ├── BoardVisualizer.tsx           # Interactive SVG renderer for Square, Hex, Track, & Graph boards + highlights
 │       ├── BoardCreatorTab.tsx           # Tab 1: Board topology, tile brush, tile inspector, & blueprint upload
 │       ├── PiecesAndStatsTab.tsx         # Tab 2: Player stats, global stats, & unit archetype editor + CSV import
 │       ├── CardsAndDecksTab.tsx          # Tab 3: Deck settings, card gallery, effect builder, & CSV import
 │       ├── RulesAndTurnsTab.tsx          # Tab 4: Turn phases, win/loss conditions, rule triggers, & DSL compiler
-│       └── SimulationStudioTab.tsx       # Tab 5: Monte Carlo runner, flaw diagnostics, charts, & turn-by-turn replay
+│       ├── SimulationStudioTab.tsx       # Tab 5: Monte Carlo runner, flaw diagnostics, charts, & turn-by-turn replay
+│       └── PlaytestTableTab.tsx          # Tab 6: Interactive Human playtest mode & single-game slow-log console
 ```
 
 ---
